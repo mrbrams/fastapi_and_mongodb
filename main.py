@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-
+from typing import List
 from crud import crud_service, user_crud_service
 import schema
 from auth import pwd_context, authenticate_user, create_access_token, get_current_user
@@ -27,32 +27,33 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token = create_access_token(data={"sub": user.get('username')})
     return {"access_token": access_token, "token_type": "bearer", "user_id": user.get('id')}
 
-@app.post("/books")
+@app.post("/books", response_model=schema.Book)
 def create_book(book_data: schema.BookCreate, user: schema.UserBase = Depends(get_current_user)):
+    # This is for the current authenticated user
     book = crud_service.create_book(book_data)
     return {"message": "Book created successfully!", "data": book}
 
-@app.get("/books")
-def get_all_books(skip: int = 0, limit: int = 10):
+@app.get("/books", response_model=List[schema.Book])
+def get_all_books(skip: int = 0, limit: int = 10, user: schema.UserBase = Depends(get_current_user)):
     books = crud_service.get_all_books(skip, limit)
     return {"data": books}
 
-@app.get("/books/{book_id}")
-def get_book_by_id(book_id: str):
+@app.get("/books/{book_id}", response_model=schema.Book)
+def get_book_by_id(book_id: str, user: schema.UserBase = Depends(get_current_user)):
     book = crud_service.get_book_by_id(book_id)
     if not book:
-        return {"message": "Book not found"}
+        raise HTTPException(status_code=404, detail="Book not found")
     return {"data": book}
 
-@app.put("/books/{book_id}")
-def update_book(book_id: str, book_data: schema.BookUpdate):
+@app.put("/books/{book_id}", response_model=schema.Book)
+def update_book(book_id: str, book_data: schema.BookUpdate, user: schema.UserBase = Depends(get_current_user)):
     book = crud_service.update_book(book_id, book_data)
     if not book:
         raise HTTPException(detail="Book not found", status_code=status.HTTP_400_BAD_REQUEST)
     return {"message": "Book updated successfully!", "data": book}
 
 @app.delete("/books/{book_id}")
-def delete_book(book_id: str):
+def delete_book(book_id: str, user: schema.UserBase = Depends(get_current_user)):
     result = crud_service.delete_book(book_id)
     if not result:
         raise HTTPException(detail="Book not found", status_code=status.HTTP_400_BAD_REQUEST)
